@@ -102,3 +102,23 @@ def test_telegram_env_allowlist_decision_decodes_bracket_list(monkeypatch):
     monkeypatch.setenv("TELEGRAM_ALLOWED_USERS", '["888"]')
     assert TelegramAdapter._env_allowlist_decision("888") is True
     assert TelegramAdapter._env_allowlist_decision("000") is False
+
+
+def test_slack_interactive_env_fallback_decodes_bracket_list(monkeypatch):
+    from plugins.platforms.slack.adapter import SlackAdapter
+
+    # object.__new__: no injected auth check and no runner handler, so the env-only fallback runs.
+    adapter = object.__new__(SlackAdapter)
+    for var in ("SLACK_ALLOW_ALL_USERS", "GATEWAY_ALLOW_ALL_USERS", "GATEWAY_ALLOWED_USERS"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("SLACK_ALLOWED_USERS", '["U111", "U222"]')
+    assert adapter._is_interactive_user_authorized("U111", channel_id="C1") is True
+    assert adapter._is_interactive_user_authorized("U999", channel_id="C1") is False
+
+    monkeypatch.delenv("SLACK_ALLOWED_USERS")
+    monkeypatch.setenv("GATEWAY_ALLOWED_USERS", '["U333"]')
+    assert adapter._is_interactive_user_authorized("U333", channel_id="D1") is True
+
+    monkeypatch.setenv("SLACK_ALLOWED_USERS", "U444, U555")  # plain CSV keeps its meaning
+    assert adapter._is_interactive_user_authorized("U555", channel_id="C1") is True
+    assert adapter._is_interactive_user_authorized("U999", channel_id="C1") is False
