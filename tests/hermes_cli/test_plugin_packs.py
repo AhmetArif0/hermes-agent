@@ -197,6 +197,18 @@ def test_sanitized_entry_config_redacts_credential_bearing_values():
     assert result["dsn"] == "postgres://admin:***@db.example.com/app"
 
 
+def test_sanitized_entry_config_redacts_even_when_redaction_is_disabled(monkeypatch):
+    """``security.redact_secrets: false`` relaxes tool-output redaction, not the pack export: a
+    pack is shared with other people, so the export boundary redacts regardless (force=True)."""
+    monkeypatch.setattr("agent.redact._REDACT_ENABLED", False)
+    fake_cfg = {"plugins": {"entries": {"demo": {
+        "dsn": "postgres://admin:hunter2@db.example.com/app",
+    }}}}
+    with mock.patch("hermes_cli.config.read_raw_config_readonly", return_value=fake_cfg):
+        result = real_sanitized_entry_config("demo")
+    assert result["dsn"] == "postgres://admin:***@db.example.com/app"
+
+
 def test_parse_pack_validates_config_section():
     text = _pack_yaml(config={"tts-plugin": {"granted_capabilities": ["tools"]}})
     with pytest.raises(PackError):
